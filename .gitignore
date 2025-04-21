@@ -77,3 +77,5 @@ $RECYCLE.BIN/
 .idea/
 *.sublime-workspace
 *.sublime-project
+.vercel
+.env*.local
