@@ -334,23 +334,7 @@ export default function PiFinderPage() {
                 Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min((currentPage - 1) * ITEMS_PER_PAGE + displayPhysicians.length, totalCountToShow)} of {totalCountToShow} results
               </p>
               {/* Filters button with loading state */}
-              <div className="relative">
-                <button
-                  className="inline-flex items-center justify-center px-4 py-2 border rounded-md bg-muted text-sm font-medium"
-                  disabled={metaLoading}
-                  style={{ minWidth: 100 }}
-                >
-                  {metaLoading ? (
-                    <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                  ) : null}
-                  Filters
-                </button>
-                {!metaLoading && (
-                  <div className="absolute inset-0">
-                    <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} />
-                  </div>
-                )}
-              </div>
+              <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} loading={metaLoading} />
             </div>
           )}
           {allLoading && <Skeleton className="h-8 w-32" />}

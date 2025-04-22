@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { TrialMeta } from "@/lib/types"
+import { Loader2 } from "lucide-react"
 
 export interface TrialFilters {
   phases: string[]
@@ -24,11 +25,12 @@ type Props = {
   meta: TrialMeta[]
   filters: TrialFilters
   onChange: (f: TrialFilters) => void
+  loading?: boolean
 }
 
 const PHASE_OPTIONS = ["1", "2", "3", "4", "NA"]
 
-export function TrialFilterDrawer({ meta, filters, onChange }: Props) {
+export function TrialFilterDrawer({ meta, filters, onChange, loading }: Props) {
   const [local, setLocal] = useState<TrialFilters>(filters)
 
   // Sync prop → local when drawer reopens
@@ -50,7 +52,10 @@ export function TrialFilterDrawer({ meta, filters, onChange }: Props) {
   return (
     <Drawer>
       <DrawerTrigger asChild>
-        <Button variant="outline">Filters</Button>
+        <Button variant="outline" disabled={loading}>
+          {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+          Filters
+        </Button>
       </DrawerTrigger>
       <DrawerContent className="p-4 space-y-6">
         <DrawerHeader>
