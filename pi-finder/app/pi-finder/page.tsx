@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Search, AlertCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,7 @@ import type { ApiResponse, Physician } from "@/lib/constants"
 import { TrialMeta } from "@/lib/types"
 import { useTrialMeta } from "@/hooks/use-trial-meta"
 import { TrialFilterDrawer, type TrialFilters } from "@/components/trial-filter-drawer"
+import Image from "next/image"
 
 // Centralized default filters so we can easily reset them when starting a new search
 const DEFAULT_FILTERS: TrialFilters = { phases: [], sponsorType: "Any", recruitingOnly: false }
@@ -55,6 +56,112 @@ export default function PiFinderPage() {
     placeholderData: (prev: ApiResponse | undefined) => prev,
     retry: 1,
   })
+
+  // Helper to determine if any trial filter is active
+  const isTrialFilterActive = useMemo(() => {
+    return (
+      filters.phases.length > 0 ||
+      filters.sponsorType !== "Any" ||
+      filters.recruitingOnly
+    )
+  }, [filters])
+
+  // State to hold all physicians when filtering client-side
+  const [allPhysicians, setAllPhysicians] = useState<Physician[] | null>(null)
+  const [allLoading, setAllLoading] = useState(false)
+  const [allError, setAllError] = useState<string | null>(null)
+
+  // Fetch all physicians if trial filter is active
+  useEffect(() => {
+    let cancelled = false
+    if (isTrialFilterActive && searchParams) {
+      setAllLoading(true)
+      setAllError(null)
+      fetchResults(
+        searchParams.zipCode,
+        searchParams.radius,
+        searchParams.indications,
+        1,
+        searchParams.startYear,
+        searchParams.endYear,
+        true // fetchAll
+      )
+        .then((res) => {
+          if (!cancelled) setAllPhysicians(res.physicians)
+        })
+        .catch((err) => {
+          if (!cancelled) setAllError(err.message || "Failed to fetch all results")
+        })
+        .finally(() => {
+          if (!cancelled) setAllLoading(false)
+        })
+    } else {
+      setAllPhysicians(null)
+      setAllLoading(false)
+      setAllError(null)
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [isTrialFilterActive, searchParams])
+
+  // Gather unique NCT IDs from the correct physician set
+  const nctIds = useMemo(() => {
+    const base = isTrialFilterActive && allPhysicians ? allPhysicians : data?.physicians || []
+    return base
+      .map((p) => p.nctId)
+      .filter((id): id is string => typeof id === "string" && id.length > 0)
+  }, [data?.physicians, allPhysicians, isTrialFilterActive])
+
+  const {
+    data: trialMeta = [],
+    isLoading: metaLoading,
+    error: metaError,
+  } = useTrialMeta(nctIds)
+
+  // Fast lookup map for filters
+  const metaMap = useMemo(() => {
+    const m = new Map<string, TrialMeta>()
+    for (const tm of trialMeta) m.set(tm.nctId, tm)
+    return m
+  }, [trialMeta])
+
+  // Apply trial meta filters to the correct physician set
+  const filteredPhysicians = useMemo(() => {
+    const base = isTrialFilterActive && allPhysicians ? allPhysicians : data?.physicians || []
+    if (!base.length) return []
+    // Early return when no filters are active
+    const noPhase = filters.phases.length === 0
+    const anySponsor = filters.sponsorType === "Any"
+    const noRecruit = !filters.recruitingOnly
+    if (!isTrialFilterActive || (noPhase && anySponsor && noRecruit)) return base
+
+    return base.filter((p) => {
+      const meta = p.nctId ? metaMap.get(p.nctId) : undefined
+      if (!meta) return false // Cannot evaluate → exclude
+      if (filters.phases.length && !filters.phases.includes(meta.phase)) return false
+      if (filters.sponsorType === "Industry" && meta.fundedBy?.toLowerCase() !== "industry") return false
+      if (filters.recruitingOnly && !(meta.overallStatus?.toLowerCase().startsWith("recruit"))) return false
+      return true
+    })
+  }, [data?.physicians, allPhysicians, metaMap, filters, isTrialFilterActive])
+
+  // Paginate filtered results in memory if trial filter is active
+  const paginatedPhysicians = useMemo(() => {
+    if (isTrialFilterActive) {
+      const start = (currentPage - 1) * ITEMS_PER_PAGE
+      const end = start + ITEMS_PER_PAGE
+      return filteredPhysicians.slice(start, end)
+    }
+    return filteredPhysicians
+  }, [filteredPhysicians, currentPage, isTrialFilterActive])
+
+  // Use filtered count for pagination and display if trial filter is active
+  const displayPhysicians = paginatedPhysicians
+  const filteredTotalCount = filteredPhysicians.length
+  const filteredTotalPages = Math.ceil(filteredTotalCount / ITEMS_PER_PAGE)
+  const totalCountToShow = isTrialFilterActive ? filteredTotalCount : data?.totalCount || 0
+  const totalPagesToShow = isTrialFilterActive ? filteredTotalPages : Math.ceil((data?.totalCount || 0) / ITEMS_PER_PAGE)
 
   const handleSearch = () => {
     // Reset any previously‑applied trial attribute filters to their defaults so that a
@@ -115,54 +222,13 @@ export default function PiFinderPage() {
   const isYearValid = (y: string) => y === "" || (/^[0-9]{4}$/.test(y) && Number(y) >= 1900 && Number(y) <= 2100)
   const isYearRangeValid = isYearValid(startYear) && isYearValid(endYear)
 
-  // Gather unique NCT IDs from fetched physicians
-  const nctIds = useMemo(() => {
-    return physicians
-      .map((p) => p.nctId)
-      .filter((id): id is string => typeof id === "string" && id.length > 0)
-  }, [physicians])
-
-  const {
-    data: trialMeta = [],
-    isLoading: metaLoading,
-    error: metaError,
-  } = useTrialMeta(nctIds)
-
-  // Fast lookup map for filters
-  const metaMap = useMemo(() => {
-    const m = new Map<string, TrialMeta>()
-    for (const tm of trialMeta) m.set(tm.nctId, tm)
-    return m
-  }, [trialMeta])
-
-  const filteredPhysicians = useMemo(() => {
-    if (!physicians.length) return []
-    // Early return when no filters are active
-    const noPhase = filters.phases.length === 0
-    const anySponsor = filters.sponsorType === "Any"
-    const noRecruit = !filters.recruitingOnly
-    if (noPhase && anySponsor && noRecruit) return physicians
-
-    return physicians.filter((p) => {
-      const meta = p.nctId ? metaMap.get(p.nctId) : undefined
-      if (!meta) return false // Cannot evaluate → exclude
-
-      if (filters.phases.length && !filters.phases.includes(meta.phase)) return false
-      if (filters.sponsorType === "Industry" && meta.fundedBy?.toLowerCase() !== "industry") return false
-      if (filters.recruitingOnly && !(meta.overallStatus?.toLowerCase().startsWith("recruit"))) return false
-      return true
-    })
-  }, [physicians, metaMap, filters])
-
-  // The array we actually render
-  const displayPhysicians = filteredPhysicians
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 w-full border-b bg-background/80 backdrop-blur-sm">
-        <div className="container flex h-16 items-center px-4 md:px-6">
-          <h1 className="text-xl font-bold">PI Finder</h1>
+        <div className="container flex h-16 items-center px-4 md:px-6 gap-2">
+          <Image src="/images/reticular-logo.svg" alt="Reticular logo" width={40} height={40} />
+          <h1 className="text-logo">Reticular</h1>
         </div>
       </header>
 
@@ -286,15 +352,17 @@ export default function PiFinderPage() {
           {error && <ErrorMessage message={(error as Error).message} onRetry={() => refetch()} />}
 
           {/* Results count and pagination info */}
-          {searchParams && !isSearching && !error && displayPhysicians.length > 0 && (
+          {searchParams && !(isSearching || allLoading) && !error && !allError && displayPhysicians.length > 0 && (
             <div className="flex justify-between items-center mb-2">
               <p className="text-sm text-muted-foreground" aria-live="polite">
-                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min((currentPage - 1) * ITEMS_PER_PAGE + displayPhysicians.length, totalCount)} of {totalCount} results
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min((currentPage - 1) * ITEMS_PER_PAGE + displayPhysicians.length, totalCountToShow)} of {totalCountToShow} results
               </p>
               {/* Filters button */}
               <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} />
             </div>
           )}
+          {allLoading && <Skeleton className="h-8 w-32" />}
+          {allError && <ErrorMessage message={allError} onRetry={() => setFilters(DEFAULT_FILTERS)} />}
 
           {isSearching ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-live="polite" aria-busy="true">
@@ -326,7 +394,7 @@ export default function PiFinderPage() {
               </div>
 
               {/* Pagination Controls */}
-              <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+              <PaginationControls currentPage={currentPage} totalPages={totalPagesToShow} onPageChange={handlePageChange} />
             </>
           ) : searchParams && !error ? (
             <EmptyPlaceholder message="No PIs match the selected filters." />

@@ -7,6 +7,7 @@ export async function fetchResults(
   page = 1,
   startYear?: number,
   endYear?: number,
+  fetchAll = false,
 ): Promise<ApiResponse> {
   // Basic argument validation (client‑side)
   if (!/^[0-9]{5}$/.test(zipCode)) {
@@ -16,8 +17,13 @@ export async function fetchResults(
   const params = new URLSearchParams({
     zip: zipCode,
     radius: String(radius),
-    page: String(page),
   })
+
+  if (fetchAll) {
+    params.set("all", "1")
+  } else {
+    params.set("page", String(page))
+  }
 
   if (indications.length) {
     params.set("indications", indications.join(","))

@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
   const zip = searchParams.get("zip") ?? ""
   const radiusMiles = Number(searchParams.get("radius") ?? "15")
   const page = Math.max(Number(searchParams.get("page") ?? "1"), 1)
+  const fetchAll = searchParams.has("all")
 
   // Optional date range filters – 4‑digit years
   const startYear = searchParams.get("startYear")
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   const zipList: string[] = zipcodes.radius(zip, radiusMiles) as string[]
 
-  const offset = (page - 1) * ITEMS_PER_PAGE
+  const offset = fetchAll ? 0 : (page - 1) * ITEMS_PER_PAGE
 
   // ----- Dynamic where conditions -----
   const whereClauses = [inArray(investigators.zip, zipList)]
@@ -66,13 +67,19 @@ export async function GET(req: NextRequest) {
   const whereExpr = whereClauses.length > 1 ? and(...whereClauses) : whereClauses[0]
 
   // ----- DB queries -----
-  const rowsPromise = db
-    .select()
-    .from(investigators)
-    .where(whereExpr)
-    .orderBy(sql`start_date desc`)
-    .limit(ITEMS_PER_PAGE)
-    .offset(offset)
+  const rowsPromise = fetchAll
+    ? db
+        .select()
+        .from(investigators)
+        .where(whereExpr)
+        .orderBy(sql`start_date desc`)
+    : db
+        .select()
+        .from(investigators)
+        .where(whereExpr)
+        .orderBy(sql`start_date desc`)
+        .limit(ITEMS_PER_PAGE)
+        .offset(offset)
 
   const countPromise = db
     .select({ count: sql<number>`count(*)` })
