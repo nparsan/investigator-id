@@ -105,6 +105,20 @@ export function TrialFilterDrawer({ meta, filters, onChange }: Props) {
           </div>
         </div>
 
+        {/* Indications (coming soon) */}
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Indications <span className="text-xs text-muted-foreground">(coming soon)</span></p>
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              className="bg-muted text-muted-foreground border rounded px-3 py-2 w-full cursor-not-allowed"
+              placeholder="e.g. asthma, COPD"
+              disabled
+            />
+            <Button variant="secondary" disabled className="opacity-60 cursor-not-allowed">Filter</Button>
+          </div>
+        </div>
+
         <DrawerFooter>
           <Button onClick={apply}>Apply</Button>
           <DrawerClose asChild>

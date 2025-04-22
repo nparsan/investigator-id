@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Search, AlertCircle } from "lucide-react"
+import { Search, AlertCircle, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -26,14 +26,12 @@ const DEFAULT_FILTERS: TrialFilters = { phases: [], sponsorType: "Any", recruiti
 export default function PiFinderPage() {
   const [zipCode, setZipCode] = useState(DEFAULT_ZIP)
   const [radius, setRadius] = useState(DEFAULT_RADIUS)
-  const [indications, setIndications] = useState("")
   const [startYear, setStartYear] = useState<string>("")
   const [endYear, setEndYear] = useState<string>("")
   const [currentPage, setCurrentPage] = useState(1)
   const [searchParams, setSearchParams] = useState<{
     zipCode: string
     radius: number
-    indications: string[]
     startYear?: number
     endYear?: number
   } | null>(null)
@@ -46,7 +44,7 @@ export default function PiFinderPage() {
         ? fetchResults(
             searchParams.zipCode,
             searchParams.radius,
-            searchParams.indications,
+            [],
             currentPage,
             searchParams.startYear,
             searchParams.endYear,
@@ -80,7 +78,7 @@ export default function PiFinderPage() {
       fetchResults(
         searchParams.zipCode,
         searchParams.radius,
-        searchParams.indications,
+        [],
         1,
         searchParams.startYear,
         searchParams.endYear,
@@ -174,11 +172,6 @@ export default function PiFinderPage() {
       return
     }
 
-    const indicationsArray = indications
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-
     // Validate years (blank is allowed)
     const isValidYear = (y: string) => y === "" || (/^[0-9]{4}$/.test(y) && Number(y) >= 1900 && Number(y) <= 2100)
     if (!isValidYear(startYear) || !isValidYear(endYear)) {
@@ -199,7 +192,6 @@ export default function PiFinderPage() {
     setSearchParams({
       zipCode,
       radius,
-      indications: indicationsArray,
       startYear: syFixed,
       endYear: eyFixed,
     })
@@ -281,22 +273,6 @@ export default function PiFinderPage() {
                 />
               </div>
 
-              <div className="space-y-3">
-                <label htmlFor="indications" className="text-sm font-medium">
-                  Indications
-                </label>
-                <Input
-                  id="indications"
-                  placeholder="e.g. asthma, COPD"
-                  value={indications}
-                  onChange={(e) => setIndications(e.target.value)}
-                  aria-describedby="indications-hint"
-                />
-                <p id="indications-hint" className="text-xs text-muted-foreground">
-                  e.g. asthma, COPD
-                </p>
-              </div>
-
               {/* Year Range Inputs */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -357,8 +333,24 @@ export default function PiFinderPage() {
               <p className="text-sm text-muted-foreground" aria-live="polite">
                 Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min((currentPage - 1) * ITEMS_PER_PAGE + displayPhysicians.length, totalCountToShow)} of {totalCountToShow} results
               </p>
-              {/* Filters button */}
-              <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} />
+              {/* Filters button with loading state */}
+              <div className="relative">
+                <button
+                  className="inline-flex items-center justify-center px-4 py-2 border rounded-md bg-muted text-sm font-medium"
+                  disabled={metaLoading}
+                  style={{ minWidth: 100 }}
+                >
+                  {metaLoading ? (
+                    <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                  ) : null}
+                  Filters
+                </button>
+                {!metaLoading && (
+                  <div className="absolute inset-0">
+                    <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {allLoading && <Skeleton className="h-8 w-32" />}
