@@ -33,6 +33,7 @@
     --ring: 224 71% 45%;
 
     --radius: 0.75rem;
+    --text-grey-bold: rgba(0, 0, 0, 0.75);
   }
 }
 
@@ -42,5 +43,20 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .text-logo {
+    font-family: 'Manrope', var(--font-manrope), sans-serif;
+    font-weight: 400;
+    font-size: 22px;
+    line-height: 1.2em;
+    color: var(--text-grey-bold);
+  }
+  @media (min-width: 640px) {
+    .text-logo {
+      font-size: 28px;
+    }
   }
 }

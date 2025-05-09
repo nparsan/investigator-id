@@ -11,6 +11,7 @@ const CT_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
 // Only request the JSON paths our UI needs to build filters → keeps payloads tiny.
 const KEEP_FIELDS = [
   "protocolSection.identificationModule.nctId",
+  "protocolSection.identificationModule.briefTitle",
   "protocolSection.designModule.phases",
   "protocolSection.sponsorCollaboratorsModule.leadSponsor.class",
   "protocolSection.statusModule.overallStatus",
@@ -20,6 +21,7 @@ type CtStudy = {
   protocolSection: {
     identificationModule: {
       nctId: string
+      briefTitle?: string
     }
     designModule?: {
       phases?: string[]
@@ -76,6 +78,7 @@ async function fetchTrialMeta(ids: string[]) {
   // Trim shape – keep only what UI needs.
   return out.map((s) => ({
     nctId: s.protocolSection.identificationModule.nctId,
+    title: s.protocolSection.identificationModule.briefTitle ?? null,
     // Normalize phase string (e.g., "Phase 1", "Phase 2/Phase 3") → "1" | "2" | "3" | "4" | "NA"
     phase: (() => {
       const raw = s.protocolSection.designModule?.phases?.[0] ?? "NA"
