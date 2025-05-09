@@ -26,15 +26,21 @@ type Props = {
   filters: TrialFilters
   onChange: (f: TrialFilters) => void
   loading?: boolean
+  showPhaseCounts?: boolean
 }
 
 const PHASE_OPTIONS = ["1", "2", "3", "4", "NA"]
 
-export function TrialFilterDrawer({ meta, filters, onChange, loading }: Props) {
+export function TrialFilterDrawer({ meta, filters, onChange, loading, showPhaseCounts }: Props) {
   const [local, setLocal] = useState<TrialFilters>(filters)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   // Sync prop → local when drawer reopens
-  useEffect(() => setLocal(filters), [filters])
+  useEffect(() => {
+    if (isDrawerOpen) {
+      setLocal(filters) 
+    }
+  }, [filters, isDrawerOpen])
 
   const counts = useMemo(() => {
     const map: Record<string, number> = {}
@@ -47,10 +53,11 @@ export function TrialFilterDrawer({ meta, filters, onChange, loading }: Props) {
 
   const apply = () => {
     onChange(local)
+    setIsDrawerOpen(false) // Close drawer on apply
   }
 
   return (
-    <Drawer>
+    <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
       <DrawerTrigger asChild>
         <Button variant="outline" disabled={loading}>
           {loading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
@@ -73,7 +80,7 @@ export function TrialFilterDrawer({ meta, filters, onChange, loading }: Props) {
             {PHASE_OPTIONS.map((p) => (
               <ToggleGroupItem key={p} value={p} aria-label={`Phase ${p}`}>
                 {`Phase ${p}`}
-                {counts[p] ? <span className="ml-1 text-muted-foreground text-xs">({counts[p]})</span> : null}
+                {showPhaseCounts && counts[p] ? <span className="ml-1 text-muted-foreground text-xs">({counts[p]})</span> : null}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

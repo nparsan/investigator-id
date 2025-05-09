@@ -68,6 +68,7 @@ export default function PiFinderPage() {
   const [allPhysicians, setAllPhysicians] = useState<Physician[] | null>(null)
   const [allLoading, setAllLoading] = useState(false)
   const [allError, setAllError] = useState<string | null>(null)
+  const [allPhysiciansDataAvailable, setAllPhysiciansDataAvailable] = useState(false)
 
   // Fetch all physicians if trial filter is active
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function PiFinderPage() {
     if (isTrialFilterActive && searchParams) {
       setAllLoading(true)
       setAllError(null)
+      setAllPhysiciansDataAvailable(false) // Reset before fetch
       fetchResults(
         searchParams.zipCode,
         searchParams.radius,
@@ -85,18 +87,25 @@ export default function PiFinderPage() {
         true // fetchAll
       )
         .then((res) => {
-          if (!cancelled) setAllPhysicians(res.physicians)
+          if (!cancelled) {
+            setAllPhysicians(res.physicians)
+            setAllPhysiciansDataAvailable(true) // Set true on success
+          }
         })
         .catch((err) => {
-          if (!cancelled) setAllError(err.message || "Failed to fetch all results")
+          if (!cancelled) {
+            setAllError(err.message || "Failed to fetch all results")
+            setAllPhysiciansDataAvailable(false) // Set false on error
+          }
         })
         .finally(() => {
           if (!cancelled) setAllLoading(false)
         })
     } else {
       setAllPhysicians(null)
-      setAllLoading(false)
+      // setAllLoading(false) // Handled by finally in the if block
       setAllError(null)
+      setAllPhysiciansDataAvailable(false) // Reset if not active or no searchParams
     }
     return () => {
       cancelled = true
@@ -213,6 +222,8 @@ export default function PiFinderPage() {
   const isZipCodeValid = !zipCode || (zipCode.length === 5 && /^\d+$/.test(zipCode))
   const isYearValid = (y: string) => y === "" || (/^[0-9]{4}$/.test(y) && Number(y) >= 1900 && Number(y) <= 2100)
   const isYearRangeValid = isYearValid(startYear) && isYearValid(endYear)
+
+  const showPhaseCounts = allPhysiciansDataAvailable && !metaLoading && !metaError
 
   return (
     <div className="min-h-screen bg-background">
@@ -334,7 +345,7 @@ export default function PiFinderPage() {
                 Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min((currentPage - 1) * ITEMS_PER_PAGE + displayPhysicians.length, totalCountToShow)} of {totalCountToShow} results
               </p>
               {/* Filters button with loading state */}
-              <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} loading={metaLoading} />
+              <TrialFilterDrawer meta={trialMeta} filters={filters} onChange={setFilters} loading={metaLoading} showPhaseCounts={showPhaseCounts} />
             </div>
           )}
           {allLoading && <Skeleton className="h-8 w-32" />}
